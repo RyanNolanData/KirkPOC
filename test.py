@@ -88,7 +88,7 @@ def format_currency(amount):
         else:
             # Format with commas and 2 decimal places
             formatted = f"{val:,.2f}"
-            return f"($ {formatted})"
+            return f"$ {formatted}"
     except:
         return "($ -  )"
 
