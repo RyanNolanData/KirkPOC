@@ -17,7 +17,8 @@ def parse_fixed_width_mmr(content):
         
         pmt_date = line[0:6].strip()
         mbi = line[6:17].strip()
-        ap_date = line[17:29].strip()
+        ap_date_raw = line[17:].strip()
+        ap_date = ap_date_raw[:10] if len(ap_date_raw) >= 10 else ""
         
         
         adj_rsn_cd = line[29:31].strip() if len(line) > 29 else ""
