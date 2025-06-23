@@ -1,3 +1,4 @@
+#import openpyxl
 import streamlit as st
 import pandas as pd
 from io import BytesIO, StringIO
@@ -9,32 +10,34 @@ warnings.filterwarnings("ignore")
 def parse_fixed_width_mmr(content):
     lines = content.strip().split('\n')
     data = []
-    
+
     for line in lines:
         if not line.strip():
             continue
-            
-        
+
         pmt_date = line[0:6].strip()
         mbi = line[6:17].strip()
-        ap_date_raw = line[17:].strip()
-        ap_date = ap_date_raw[:10] if len(ap_date_raw) >= 10 else ""
-        
-        
-        adj_rsn_cd = line[29:31].strip() if len(line) > 29 else ""
-        
-        
-        if adj_rsn_cd:
-            ma_raf = line[31:36].strip()
-            risk_adj_pmt = line[36:50].strip()
-            tot_ma_pmt = line[50:64].strip()
-            rebates = line[64:78].strip()
+
+        # Extract rest of line after char 17
+        rest = line[17:].strip()
+
+        ap_date = rest[0:10].strip()
+        after_date = rest[10:].lstrip()
+
+        # Check if the next two characters are '26'
+        if after_date.startswith("26"):
+            adj_rsn_cd = "26"
+            ma_raf = after_date[2:7].strip()
+            risk_adj_pmt = after_date[7:21].strip()
+            tot_ma_pmt = after_date[21:35].strip()
+            rebates = after_date[35:49].strip()
         else:
-            ma_raf = line[29:34].strip()
-            risk_adj_pmt = line[34:48].strip()
-            tot_ma_pmt = line[48:62].strip()
-            rebates = line[62:76].strip()
-        
+            adj_rsn_cd = ""
+            ma_raf = after_date[0:5].strip()
+            risk_adj_pmt = after_date[5:19].strip()
+            tot_ma_pmt = after_date[19:33].strip()
+            rebates = after_date[33:47].strip()
+
         data.append({
             'PmtDate': pmt_date,
             'MBI': mbi,
@@ -45,8 +48,9 @@ def parse_fixed_width_mmr(content):
             'TotMAPmt': tot_ma_pmt,
             'Rebates': rebates
         })
-    
+
     return pd.DataFrame(data)
+
 
 def parse_pipe_delimited_mmr(content):
     df = pd.read_csv(StringIO(content), sep='|')
@@ -57,9 +61,7 @@ def format_date(date_str):
     if not date_str or pd.isna(date_str):
         return ""
     
-    
     date_str = str(date_str).strip()
-    
     
     if ' ' in date_str:
         date_str = date_str.split(' ')[0]
@@ -78,20 +80,20 @@ def format_date(date_str):
 
 def format_currency(amount):
     if not amount or pd.isna(amount) or str(amount).strip() == '':
-        return "($ -  )"
+        return "$ -    "
     
     try:
         # Convert to float
         val = float(str(amount).replace(',', '').replace('$', '').replace('(', '').replace(')', '').strip())
         
         if val == 0:
-            return "($ -  )"
+            return "$ -    "
         else:
             # Format with commas and 2 decimal places
             formatted = f"{val:,.2f}"
             return f"$ {formatted}"
     except:
-        return "($ -  )"
+        return "$ -    "
 
 def format_ma_raf(raf_value):
     """Format MA_RAF to 4 decimal places"""
@@ -117,7 +119,17 @@ def standardize_data(df):
    
     result_df = result_df.rename(columns={'TotMAPmt': 'TotalMAPmt'})
     
-    result_df['AdjRsnCd'] = result_df['AdjRsnCd'].fillna('')
+    #result_df['AdjRsnCd'] = result_df['AdjRsnCd'].fillna('')
+
+    def clean_adj_rsn_cd(value):
+        try:
+            val = str(value).strip()
+            return "26" if val in ["26", "26.0"] else ""
+        except:
+            return ""
+
+    result_df['AdjRsnCd'] = result_df['AdjRsnCd'].apply(clean_adj_rsn_cd)
+
     
     return result_df
 
